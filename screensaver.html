@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Screensaver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@300;400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #000000;
+    --fg: #ffffff;
+    --muted: #555;
+    --card: #1a1a1a;
+    --accent: #ffffff;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  #app {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    position: relative;
+  }
+
+  /* ── CLOCK ── */
+  #clock {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(5rem, 18vw, 14rem);
+    line-height: 1;
+    letter-spacing: -0.02em;
+    color: var(--fg);
+    animation: fadeIn 1s ease both;
+  }
+
+  /* ── LOCATION + WEATHER ── */
+  #meta {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(1.2rem, 3vw, 2rem);
+    letter-spacing: 0.15em;
+    color: var(--fg);
+    margin-top: -0.3rem;
+    animation: fadeIn 1.2s ease both;
+  }
+
+  #weather-icon {
+    font-size: 1.4em;
+    line-height: 1;
+  }
+
+  /* ── RSS TICKER ── */
+  #ticker-wrap {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    overflow: hidden;
+    height: 52px;
+    border-top: 1px solid #1f1f1f;
+    background: #000;
+    display: flex;
+    align-items: center;
+    animation: fadeIn 1.6s ease both;
+  }
+
+  #ticker-label {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.2em;
+    color: #fff;
+    background: #fff;
+    color: #000;
+    padding: 0 14px;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  #ticker-track {
+    display: flex;
+    white-space: nowrap;
+    will-change: transform;
+    animation: tickerScroll 60s linear infinite;
+  }
+
+  #ticker-track.paused { animation-play-state: paused; }
+
+  .ticker-item {
+    font-size: 0.78rem;
+    letter-spacing: 0.08em;
+    color: #ccc;
+    padding: 0 2.5rem;
+    text-transform: uppercase;
+    position: relative;
+  }
+  .ticker-item::after {
+    content: '◆';
+    position: absolute;
+    right: 0.5rem;
+    color: var(--muted);
+    font-size: 0.5em;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  /* ── INFO CARDS ── */
+  #cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: min(500px, 85vw);
+    margin-top: 2rem;
+    animation: fadeIn 1.4s ease both;
+  }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #888;
+    transition: color 0.3s, background 0.3s;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .card .card-source {
+    color: #444;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    margin-bottom: 4px;
+  }
+
+  .card .card-title {
+    color: #ddd;
+    font-size: 0.75rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card .card-bar {
+    position: absolute;
+    top: 0; left: 0;
+    height: 2px;
+    background: #fff;
+    width: 0%;
+    transition: width 0.1s linear;
+  }
+
+  /* ── ANIMATIONS ── */
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+  }
+
+  /* ── SLEEP DIM ── */
+  #dim {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 3s ease;
+    z-index: 10;
+  }
+  #dim.active { opacity: 0.8; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <div id="clock">21:00</div>
+  <div id="meta">
+    <span id="location-name">PALAISEAU</span>
+    <span id="temp">11°</span>
+    <span id="weather-icon">☁️</span>
+  </div>
+  <div id="cards">
+    <div class="card" id="card0">
+      <div class="card-bar" id="bar0"></div>
+      <div class="card-source">RSS</div>
+      <div class="card-title">Chargement…</div>
+    </div>
+    <div class="card" id="card1">
+      <div class="card-bar" id="bar1"></div>
+      <div class="card-source">RSS</div>
+      <div class="card-title">Chargement…</div>
+    </div>
+    <div class="card" id="card2">
+      <div class="card-bar" id="bar2"></div>
+      <div class="card-source">RSS</div>
+      <div class="card-title">Chargement…</div>
+    </div>
+  </div>
+</div>
+
+<div id="ticker-wrap">
+  <div id="ticker-label">RSS</div>
+  <div id="ticker-track"></div>
+</div>
+
+<div id="dim"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────────────
+const CONFIG = {
+  location: 'PALAISEAU',
+  tempC: 11,
+  weatherCode: 'cloudy',
+  // RSS feeds proxied via allorigins
+  feeds: [
+    { name: 'France Info', url: 'https://www.franceinfo.fr/titres.rss' },
+    { name: 'Le Monde',    url: 'https://www.lemonde.fr/rss/une.xml' },
+    { name: "L'Équipe",    url: 'https://dwh.lequipe.fr/api/edito/rss?path=/Football/' },
+  ],
+  cardRotateMs: 8000,   // rotate card content every N ms
+  dimAfterMs:   120000, // dim screen after 2 min of inactivity
+};
+
+// ── CLOCK ────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, '0');
+  const m = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('clock').textContent = `${h}:${m}`;
+}
+updateClock();
+setInterval(updateClock, 1000);
+
+// ── WEATHER ICONS ────────────────────────────────────────────────
+const WEATHER_ICONS = {
+  sunny: '☀️', clear: '🌙', partly_cloudy: '⛅', cloudy: '☁️',
+  overcast: '🌫️', rainy: '🌧️', stormy: '⛈️', snowy: '❄️',
+  foggy: '🌁', windy: '💨',
+};
+document.getElementById('weather-icon').textContent =
+  WEATHER_ICONS[CONFIG.weatherCode] || '🌡️';
+document.getElementById('temp').textContent = `${CONFIG.tempC}°`;
+document.getElementById('location-name').textContent = CONFIG.location;
+
+// ── RSS FETCH ────────────────────────────────────────────────────
+let allItems = [];
+
+function parseXML(source, xmlStr) {
+  const parser = new DOMParser();
+  const xml = parser.parseFromString(xmlStr, 'text/xml');
+  const items = [...xml.querySelectorAll('item, entry')].slice(0, 20);
+  return items.map(el => {
+    let title = (el.querySelector('title')?.textContent || '').trim();
+    title = title.replace(/<!\[CDATA\[|\]\]>/g, '').trim();
+    return { source, title, link: el.querySelector('link')?.textContent || '' };
+  }).filter(i => i.title.length > 2);
+}
+
+async function fetchViaRss2json(feed) {
+  const url = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(feed.url)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const json = await res.json();
+  if (json.status !== 'ok') throw new Error('rss2json error');
+  return (json.items || []).slice(0, 20).map(i => ({
+    source: feed.name, title: (i.title || '').trim(), link: i.link || '',
+  })).filter(i => i.title.length > 2);
+}
+
+async function fetchViaAllOrigins(feed) {
+  const url = `https://api.allorigins.win/get?url=${encodeURIComponent(feed.url)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const json = await res.json();
+  if (!json.contents) throw new Error('empty');
+  return parseXML(feed.name, json.contents);
+}
+
+async function fetchViaCorsProxy(feed) {
+  const url = `https://corsproxy.io/?${encodeURIComponent(feed.url)}`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const text = await res.text();
+  return parseXML(feed.name, text);
+}
+
+async function fetchDirect(feed) {
+  const res = await fetch(feed.url, { signal: AbortSignal.timeout(6000) });
+  const text = await res.text();
+  return parseXML(feed.name, text);
+}
+
+async function fetchFeed(feed) {
+  for (const strategy of [fetchViaRss2json, fetchViaAllOrigins, fetchViaCorsProxy, fetchDirect]) {
+    try {
+      const items = await strategy(feed);
+      if (items.length > 0) return items;
+    } catch { /* essai suivant */ }
+  }
+  return [];
+}
+
+async function loadAllFeeds() {
+  const results = await Promise.all(CONFIG.feeds.map(fetchFeed));
+  allItems = results.flat();
+  if (allItems.length === 0) {
+    allItems = CONFIG.feeds.map(f => ({ source: f.name, title: `Flux non disponible — ${f.name}`, link: '' }));
+  }
+  buildTicker();
+  startCardRotation();
+}
+
+// ── TICKER ───────────────────────────────────────────────────────
+function buildTicker() {
+  const track = document.getElementById('ticker-track');
+  // duplicate for seamless loop
+  const html = [...allItems, ...allItems].map(i =>
+    `<span class="ticker-item">${i.source} — ${i.title}</span>`
+  ).join('');
+  track.innerHTML = html;
+  // dynamically recalc duration based on content width
+  requestAnimationFrame(() => {
+    const w = track.scrollWidth / 2;
+    const speed = 80; // px/s
+    const dur = Math.round(w / speed);
+    track.style.animation = `tickerScroll ${dur}s linear infinite`;
+  });
+}
+
+// ── CARD ROTATION ────────────────────────────────────────────────
+let cardIndices = [0, 1, 2];
+let progressTimers = [];
+const CARD_COUNT = 3;
+
+function showCard(slot, itemIdx) {
+  const item = allItems[itemIdx % allItems.length];
+  if (!item) return;
+  const card = document.getElementById(`card${slot}`);
+  const bar  = document.getElementById(`bar${slot}`);
+  card.querySelector('.card-source').textContent = item.source.toUpperCase();
+  card.querySelector('.card-title').textContent  = item.title;
+  bar.style.transition = 'none';
+  bar.style.width = '0%';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      bar.style.transition = `width ${CONFIG.cardRotateMs}ms linear`;
+      bar.style.width = '100%';
+    });
+  });
+}
+
+function startCardRotation() {
+  if (!allItems.length) return;
+  // show initial
+  for (let s = 0; s < CARD_COUNT; s++) {
+    cardIndices[s] = s;
+    showCard(s, cardIndices[s]);
+  }
+  let globalIdx = CARD_COUNT;
+  // stagger rotations
+  for (let s = 0; s < CARD_COUNT; s++) {
+    const delay = s * (CONFIG.cardRotateMs / CARD_COUNT);
+    setTimeout(() => {
+      setInterval(() => {
+        cardIndices[s] = globalIdx++;
+        showCard(s, cardIndices[s]);
+      }, CONFIG.cardRotateMs);
+    }, delay);
+  }
+}
+
+// ── DIM ON INACTIVITY ────────────────────────────────────────────
+let dimTimer;
+function resetDim() {
+  document.getElementById('dim').classList.remove('active');
+  clearTimeout(dimTimer);
+  dimTimer = setTimeout(() => {
+    document.getElementById('dim').classList.add('active');
+  }, CONFIG.dimAfterMs);
+}
+['mousemove','keydown','touchstart','click'].forEach(e =>
+  document.addEventListener(e, resetDim, { passive: true })
+);
+resetDim();
+
+// ── INIT ─────────────────────────────────────────────────────────
+loadAllFeeds();
+</script>
+</body>
+</html>
